@@ -27,3 +27,10 @@ def version():
     return {
         "application_version": APP_VERSION
     }
+@app.get("/employee")
+def get_employee():
+    return {
+        "employee_id": 101,
+        "employee_name": "John",
+        "department": "DevOps"
+    }
