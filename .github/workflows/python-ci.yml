@@ -34,3 +34,7 @@ jobs:
       - name: Execute Pytest
         run: |
           python -m pytest tests/ -v
+
+      - name: Build Docker Image
+        run: |
+          docker build -t employee-api:${{ github.sha }} .
