@@ -1,0 +1,37 @@
+services:
+
+  blue:
+    image: employee-api:blue-v1
+    container_name: employee-api-blue
+    ports:
+      - "8000:8000"
+    environment:
+      APP_VERSION: blue-v1
+    networks:
+      - employee-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  green:
+    image: employee-api:green-v2
+    container_name: employee-api-green
+    ports:
+      - "8001:8000"
+    environment:
+      APP_VERSION: green-v2
+    networks:
+      - employee-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  employee-network:
+    driver: bridge
