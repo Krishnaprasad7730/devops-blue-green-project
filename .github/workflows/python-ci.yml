@@ -1,74 +1,130 @@
-name: Python Application CI-CD
+name: DevSecOps CI/CD Pipeline
 
 on:
   push:
     branches:
       - main
       - develop
-
   pull_request:
     branches:
       - main
       - develop
 
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: ap-south-2
+  ECR_REPOSITORY: employee-api
+  IMAGE_TAG: ${{ github.sha }}
+
 jobs:
-  test:
-    name: Test and Build Docker Image
+
+  # ----------------------------------------
+  # SECURITY SCAN AND APPLICATION TESTS
+  # ----------------------------------------
+
+  security-and-test:
+
+    name: Security Scan and Tests
 
     runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      # Gitleaks
+      - name: Gitleaks Secret Scan
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Python
+      - name: Set Up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest httpx
+
+      # Unit tests
+      - name: Run Pytest
+        run: |
+          python -m pytest tests/ -v
+
+      # Docker
+      - name: Build Docker Image
+        run: |
+          docker build \
+            -t employee-api:${{ github.sha }} .
+
+      # Trivy
+      - name: Scan Docker Image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: employee-api:${{ github.sha }}
+          format: table
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+
+
+  # ----------------------------------------
+  # AWS AUTHENTICATION AND ECR PUSH
+  # ----------------------------------------
+
+  push-to-ecr:
+
+    name: Push Image to Amazon ECR
+
+    runs-on: ubuntu-latest
+
+    needs: security-and-test
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
 
     permissions:
       contents: read
       id-token: write
 
     steps:
-      # Step 1: Checkout source code
-      - name: Checkout source code
-        uses: actions/checkout@v4
 
-      # Step 2: Set up Python
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
+      - name: Checkout Repository
+        uses: actions/checkout@v6
 
-      # Step 3: Install dependencies
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-
-      # Step 4: Run tests
-      - name: Execute Pytest
-        run: |
-          python -m pytest tests/ -v
-
-      # Step 5: Build Docker image
-      - name: Build Docker Image
-        run: |
-          docker build -t employee-api:${{ github.sha }} .
-
-      # Step 6: Authenticate with AWS using OIDC
+      # AWS OIDC
       - name: Configure AWS Credentials
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::787391402924:role/GitHubActions-ECR-Role
-          aws-region: ap-south-2
+          aws-region: ${{ env.AWS_REGION }}
 
-      # Step 7: Login to Amazon ECR
+      # ECR login
       - name: Login to Amazon ECR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # Step 8: Push Docker image to ECR
-      - name: Push Docker Image to ECR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
+      # Docker build and push
+      - name: Build and Push Image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: employee-api
-          IMAGE_TAG: ${{ github.sha }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker tag employee-api:${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
-          docker push ${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}
+          docker build \
+            -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+
+          docker push \
+            $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Display Published Image
+        run: |
+          echo "Image published successfully:"
+          echo "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"

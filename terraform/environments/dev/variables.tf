@@ -27,3 +27,12 @@ variable "enable_nat_gateway" {
   type        = bool
   default     = false
 }
+variable "availability_zones" {
+  description = "Availability Zones for the VPC"
+  type        = list(string)
+
+  default = [
+    "ap-south-2a",
+    "ap-south-2b"
+  ]
+}

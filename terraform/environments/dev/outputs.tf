@@ -1,17 +1,43 @@
-# VPC ID
 output "vpc_id" {
-  description = "ID of the created VPC"
-  value       = aws_vpc.main.id
+  description = "VPC ID"
+  value       = module.vpc.vpc_id
 }
 
-# VPC CIDR
 output "vpc_cidr" {
-  description = "CIDR block of the VPC"
-  value       = aws_vpc.main.cidr_block
+  description = "VPC CIDR"
+  value       = module.vpc.vpc_cidr
 }
 
-# VPC ARN
-output "vpc_arn" {
-  description = "ARN of the created VPC"
-  value       = aws_vpc.main.arn
+output "public_subnet_ids" {
+  description = "Public subnet IDs"
+  value       = module.vpc.public_subnet_ids
+}
+
+output "private_subnet_ids" {
+  description = "Private subnet IDs"
+  value       = module.vpc.private_subnet_ids
+}
+
+output "internet_gateway_id" {
+  description = "Internet Gateway ID"
+  value       = module.vpc.internet_gateway_id
+}
+
+output "nat_gateway_id" {
+  description = "NAT Gateway ID"
+  value       = module.vpc.nat_gateway_id
+}
+output "ecr_repository_url" {
+  description = "ECR repository URL"
+  value       = module.ecr.repository_url
+}
+
+output "ecr_repository_arn" {
+  description = "ECR repository ARN"
+  value       = module.ecr.repository_arn
+}
+
+output "ecr_repository_name" {
+  description = "ECR repository name"
+  value       = module.ecr.repository_name
 }
