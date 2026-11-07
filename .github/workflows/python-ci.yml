@@ -19,154 +19,32 @@ env:
   IMAGE_TAG: ${{ github.sha }}
 
 jobs:
-
-  # ----------------------------------------
-  # SECURITY SCAN AND APPLICATION TESTS
-  # ----------------------------------------
-
   security-and-test:
-
     name: Security Scan and Tests
-
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      # Gitleaks
       - name: Gitleaks Secret Scan
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Python
       - name: Set Up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - name: Install Dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest httpx
-
-      # Unit tests
-      - name: Run Pytest
-        run: |
-          python -m pytest tests/ -v
-
-      # Docker
-      - name: Build Docker Image
-        run: |
-          docker build \
-            -t employee-api:${{ github.sha }} .
-
-      # Trivy
-      - name: Scan Docker Image
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: employee-api:${{ github.sha }}
-          format: table
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-
-
-  # ----------------------------------------
-  # AWS AUTHENTICATION AND ECR PUSH
-  # ----------------------------------------
-
-  push-to-ecr:
-
-    name: Push Image to Amazon ECR
-
-    runs-on: ubuntu-latest
-
-    needs: security-and-test
-
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-
-    permissions:
-      contents: read
-      id-token: write
-
-    steps:
-
-      - name: Checkout Repository
-        uses: actions/checkout@v6
-
-      # AWS OIDC
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v5
-        with:
-          role-to-assume: arn:aws:iam::787391402924:role/GitHubActions-ECR-Role
-          aws-region: ${{ env.AWS_REGION }}
-
-      name: DevSecOps CI/CD Pipeline
-
-on:
-  push:
-    branches:
-      - main
-      - develop
-  pull_request:
-    branches:
-      - main
-      - develop
-
-permissions:
-  contents: read
-
-env:
-  AWS_REGION: ap-south-2
-  ECR_REPOSITORY: employee-api
-  IMAGE_TAG: ${{ github.sha }}
-
-jobs:
-
-  # ----------------------------------------
-  # SECURITY SCANNING AND APPLICATION TESTS
-  # ----------------------------------------
-
-  security-and-test:
-
-    name: Security Scan and Tests
-
-    runs-on: ubuntu-latest
-
-    steps:
-
-      - name: Checkout Repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-
-      # 1. SECRET SCANNING
-      - name: Gitleaks Secret Scan
-        uses: gitleaks/gitleaks-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # 2. PYTHON SETUP
-      - name: Set Up Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-
-      # 3. INSTALL DEPENDENCIES
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest httpx pytest-cov
 
-      # 4. UNIT TESTING AND COVERAGE
       - name: Run Pytest with Coverage
         run: |
           python -m pytest tests/ -v \
@@ -174,19 +52,16 @@ jobs:
             --cov-report=xml:coverage.xml \
             --cov-report=term
 
-      # 5. SONARQUBE SAST
       - name: SonarQube Cloud Scan
         uses: SonarSource/sonarqube-scan-action@v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
-      # 6. DOCKER BUILD
       - name: Build Docker Image
         run: |
           docker build \
             -t employee-api:${{ github.sha }} .
 
-      # 7. CONTAINER VULNERABILITY SCAN
       - name: Scan Docker Image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -197,19 +72,10 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
 
-
-  # ----------------------------------------
-  # AWS AUTHENTICATION AND ECR PUSH
-  # ----------------------------------------
-
   push-to-ecr:
-
     name: Push Image to Amazon ECR
-
     runs-on: ubuntu-latest
-
     needs: security-and-test
-
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
 
     permissions:
@@ -217,23 +83,19 @@ jobs:
       id-token: write
 
     steps:
-
       - name: Checkout Repository
         uses: actions/checkout@v6
 
-      # AWS OIDC
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: arn:aws:iam::787391402924:role/GitHubActions-ECR-Role
           aws-region: ${{ env.AWS_REGION }}
 
-      # ECR LOGIN
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # BUILD AND PUSH
       - name: Build and Push Image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
