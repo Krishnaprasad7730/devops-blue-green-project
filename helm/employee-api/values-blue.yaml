@@ -1,0 +1,26 @@
+replicaCount: 2
+
+namespace: employee-api
+
+deployment:
+  color: blue
+
+image:
+  repository: 787391402924.dkr.ecr.ap-south-2.amazonaws.com/employee-api
+  tag: blue-v1
+  pullPolicy: IfNotPresent
+
+app:
+  version: blue-v1
+  environment: dev
+
+service:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

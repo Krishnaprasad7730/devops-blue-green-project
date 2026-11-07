@@ -1,0 +1,126 @@
+---
+# Source: employee-api/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: employee-api-config
+  namespace: employee-api
+  labels:
+    app.kubernetes.io/name: employee-api
+    app.kubernetes.io/instance: employee-api
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "1.0"
+    helm.sh/chart: employee-api-0.1.0
+data:
+  APP_VERSION: "blue-v1"
+  APP_ENV: "dev"
+
+---
+# Source: employee-api/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: employee-api-service
+  namespace: employee-api
+  labels:
+    app.kubernetes.io/name: employee-api
+    app.kubernetes.io/instance: employee-api
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "1.0"
+    helm.sh/chart: employee-api-0.1.0
+spec:
+  type: ClusterIP
+  selector:
+    app: employee-api
+    version: "blue"
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+
+---
+# Source: employee-api/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: employee-api-blue
+  namespace: employee-api
+  labels:
+    app.kubernetes.io/name: employee-api
+    app.kubernetes.io/instance: employee-api
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/version: "1.0"
+    helm.sh/chart: employee-api-0.1.0
+    app: employee-api
+    version: "blue"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: employee-api
+      version: "blue"
+  template:
+    metadata:
+      labels:
+        app: employee-api
+        version: "blue"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: employee-api
+          image: "787391402924.dkr.ecr.ap-south-2.amazonaws.com/employee-api:blue-v1"
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: employee-api-config
+
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 20
+            periodSeconds: 10
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}

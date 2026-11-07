@@ -1,0 +1,45 @@
+replicaCount: 2
+
+nameOverride: ""
+fullnameOverride: ""
+
+namespace: employee-api
+
+image:
+  repository: 787391402924.dkr.ecr.ap-south-2.amazonaws.com/employee-api
+  tag: blue-v1
+  pullPolicy: IfNotPresent
+
+app:
+  version: blue-v1
+  environment: dev
+
+deployment:
+  color: blue
+
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+probes:
+  readiness:
+    initialDelaySeconds: 10
+    periodSeconds: 5
+  liveness:
+    initialDelaySeconds: 20
+    periodSeconds: 10
+
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001

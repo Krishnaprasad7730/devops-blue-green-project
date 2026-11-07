@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: employee-api
+  labels:
+    app.kubernetes.io/name: employee-api
+    environment: dev
