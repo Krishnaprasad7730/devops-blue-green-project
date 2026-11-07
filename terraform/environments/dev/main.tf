@@ -48,6 +48,29 @@ module "eks" {
 
   cluster_enabled_log_types = []
 }
+data "tls_certificate" "eks" {
+  url = module.eks.cluster_oidc_issuer_url
+}
+
+resource "aws_iam_openid_connect_provider" "eks" {
+  url = module.eks.cluster_oidc_issuer_url
+
+  client_id_list = [
+    "sts.amazonaws.com"
+  ]
+
+  thumbprint_list = [
+    data.tls_certificate.eks.certificates[0].sha1_fingerprint
+  ]
+}
+
+module "iam_lbc" {
+  source = "../../modules/iam-lbc"
+
+  project_name      = var.project_name
+  oidc_provider_arn = aws_iam_openid_connect_provider.eks.arn
+  oidc_issuer_url   = module.eks.cluster_oidc_issuer_url
+}
 module "ecr" {
   source = "../../modules/ecr"
 
@@ -71,3 +94,4 @@ module "vpc_endpoints" {
 
   private_route_table_ids = module.vpc.private_route_table_ids
 }
+

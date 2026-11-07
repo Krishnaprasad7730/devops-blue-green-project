@@ -41,3 +41,7 @@ output "ecr_repository_name" {
   description = "ECR repository name"
   value       = module.ecr.repository_name
 }
+output "aws_load_balancer_controller_role_arn" {
+  description = "IAM role ARN for AWS Load Balancer Controller"
+  value       = module.iam_lbc.lbc_role_arn
+}

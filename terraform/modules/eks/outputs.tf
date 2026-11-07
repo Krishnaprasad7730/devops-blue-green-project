@@ -27,3 +27,7 @@ output "node_group_arn" {
   description = "EKS managed node group ARN"
   value       = aws_eks_node_group.main.arn
 }
+output "cluster_oidc_issuer_url" {
+  description = "OIDC issuer URL for the EKS cluster"
+  value       = aws_eks_cluster.main.identity[0].oidc[0].issuer
+}
