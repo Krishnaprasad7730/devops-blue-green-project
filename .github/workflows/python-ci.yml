@@ -89,6 +89,23 @@ jobs:
           ignore-unfixed: true
           vuln-type: os,library
           severity: CRITICAL,HIGH
+            # 8. Generate Software Bill of Materials
+      - name: Generate SBOM using Syft
+        uses: anchore/sbom-action@v0.24.3
+        with:
+          image: employee-api:${{ github.sha }}
+          format: spdx-json
+          output-file: employee-api.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      # 9. Upload SBOM as GitHub artifact
+      - name: Upload SBOM Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: employee-api-sbom-${{ github.sha }}
+          path: employee-api.spdx.json
+          retention-days: 14
 
   # AWS authentication and ECR publishing
   push-to-ecr:
@@ -127,3 +144,34 @@ jobs:
         run: |
           echo "Image published successfully:"
           echo "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
+            # 10. Get immutable image digest
+      - name: Get ECR Image Digest
+        id: image-digest
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          DIGEST=$(aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG" \
+            --query 'imageDetails[0].imageDigest' \
+            --output text)
+
+          if [ -z "$DIGEST" ] || [ "$DIGEST" = "None" ]; then
+            echo "Unable to retrieve image digest"
+            exit 1
+          fi
+
+          IMAGE_URI="$REGISTRY/$ECR_REPOSITORY@$DIGEST"
+
+          echo "image_uri=$IMAGE_URI" >> "$GITHUB_OUTPUT"
+
+      # 11. Install Cosign
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.1.2
+
+      # 12. Sign Docker image
+      - name: Sign Container Image
+        env:
+          IMAGE_URI: ${{ steps.image-digest.outputs.image_uri }}
+        run: |
+          cosign sign --yes "$IMAGE_URI"
