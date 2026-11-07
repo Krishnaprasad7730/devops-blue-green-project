@@ -29,22 +29,26 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 1. Secret scanning
       - name: Gitleaks Secret Scan
         uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # 2. Python setup
       - name: Set Up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
+      # 3. Dependencies
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pytest httpx pytest-cov
 
+      # 4. Unit tests and coverage
       - name: Run Pytest with Coverage
         run: |
           python -m pytest tests/ -v \
@@ -52,16 +56,18 @@ jobs:
             --cov-report=xml:coverage.xml \
             --cov-report=term
 
+      # 5. SonarQube SAST
       - name: SonarQube Cloud Scan
         uses: SonarSource/sonarqube-scan-action@v8.3.0
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
+      # 6. Docker build
       - name: Build Docker Image
         run: |
-          docker build \
-            -t employee-api:${{ github.sha }} .
+          docker build -t employee-api:${{ github.sha }} .
 
+      # 7. Container vulnerability scan
       - name: Scan Docker Image with Trivy
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -72,10 +78,12 @@ jobs:
           vuln-type: os,library
           severity: CRITICAL,HIGH
 
+  # AWS authentication and ECR publishing
   push-to-ecr:
     name: Push Image to Amazon ECR
     runs-on: ubuntu-latest
     needs: security-and-test
+
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
 
     permissions:
@@ -100,11 +108,8 @@ jobs:
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build \
-            -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-
-          docker push \
-            $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker build -t $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
       - name: Display Published Image
         run: |
