@@ -117,6 +117,15 @@ jobs:
           echo "Application failed health check"
           docker logs employee-api-dast
           exit 1
+      - name: Run Application Smoke Tests
+        run: |
+          echo "Testing application endpoints..."
+
+          curl --fail --show-error http://localhost:8000/
+          curl --fail --show-error http://localhost:8000/health
+          curl --fail --show-error http://localhost:8000/version
+
+          echo "All smoke tests passed."
 
       - name: Run OWASP ZAP Baseline Scan
         run: |
@@ -202,7 +211,8 @@ jobs:
         run: |
           echo "Image published successfully:"
           echo "${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}"
-            # 10. Get immutable image digest
+
+      # 10. Get immutable image digest
       - name: Get ECR Image Digest
         id: image-digest
         env:
