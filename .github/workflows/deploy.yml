@@ -1,0 +1,96 @@
+name: Employee API Blue-Green Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_color:
+        description: "Deployment color"
+        required: true
+        type: choice
+        options:
+          - blue
+          - green
+
+      image_tag:
+        description: "ECR image tag to deploy"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ap-south-2
+  ECR_REPOSITORY: employee-api
+  EKS_CLUSTER_NAME: devops-blue-green-dev-eks
+  NAMESPACE: employee-api
+
+jobs:
+  deploy:
+    name: Deploy Employee API
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v6
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: arn:aws:iam::787391402924:role/GitHubActions-ECR-Role
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify AWS Identity
+        run: aws sts get-caller-identity
+
+      - name: Login to ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Verify Image Exists
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          aws ecr describe-images \
+            --repository-name "$ECR_REPOSITORY" \
+            --image-ids imageTag="$IMAGE_TAG"
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME"
+
+      - name: Verify Kubernetes Connection
+        run: |
+          kubectl get nodes
+          kubectl get namespace "$NAMESPACE"
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Deploy Blue-Green Version
+        env:
+          TARGET_COLOR: ${{ inputs.target_color }}
+          IMAGE_TAG: ${{ inputs.image_tag }}
+        run: |
+          chmod +x scripts/blue-green-deploy.sh
+
+          ./scripts/blue-green-deploy.sh \
+            "$TARGET_COLOR" \
+            "$IMAGE_TAG"
+
+      - name: Verify Deployment
+        env:
+          TARGET_COLOR: ${{ inputs.target_color }}
+        run: |
+          kubectl get deployments -n "$NAMESPACE"
+          kubectl get pods -n "$NAMESPACE"
+          kubectl get services -n "$NAMESPACE"
+
+          kubectl get service employee-api-service \
+            -n "$NAMESPACE" \
+            -o jsonpath='{.spec.selector.version}'
+
+          echo ""
+          echo "Deployment workflow completed."
