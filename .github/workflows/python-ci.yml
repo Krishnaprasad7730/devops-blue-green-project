@@ -121,6 +121,7 @@ jobs:
       - name: Run OWASP ZAP Baseline Scan
         run: |
           mkdir -p reports
+          chmod -R 777 reports
 
           docker run --rm \
             --network dast-network \
