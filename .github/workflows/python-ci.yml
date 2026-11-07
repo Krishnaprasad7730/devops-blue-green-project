@@ -5,10 +5,12 @@ on:
     branches:
       - main
       - develop
+      - feature/sonarqube-integration
   pull_request:
     branches:
       - main
       - develop
+      - feature/sonarqube-integration
 
 permissions:
   contents: read
