@@ -11,7 +11,7 @@ resource "aws_ecr_repository" "main" {
   }
 
   encryption_configuration {
-    encryption_type = "AES256"
+    encryption_type = "KMS"
   }
 
   tags = {
